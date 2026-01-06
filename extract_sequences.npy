@@ -1,0 +1,68 @@
+import cv2
+import mediapipe as mp
+import os
+import numpy as np
+
+DATASET_PATH = "Dataset"   # Kaggle dataset folder
+SEQUENCE_LENGTH = 30
+OUTPUT_PATH = "sequences"
+
+os.makedirs(OUTPUT_PATH, exist_ok=True)
+
+mp_holistic = mp.solutions.holistic
+holistic = mp_holistic.Holistic(min_detection_confidence=0.5,
+                                min_tracking_confidence=0.5)
+
+label_map = {}
+label_id = 0
+
+for gesture in os.listdir(DATASET_PATH):
+    gesture_path = os.path.join(DATASET_PATH, gesture)
+    if not os.path.isdir(gesture_path):
+        continue
+
+    label_map[gesture] = label_id
+    label_id += 1
+
+    for video in os.listdir(gesture_path):
+        if not video.lower().endswith((".mp4", ".avi", ".mov")):
+            continue
+
+        cap = cv2.VideoCapture(os.path.join(gesture_path, video))
+        sequence = []
+
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            result = holistic.process(rgb)
+
+            frame_features = []
+
+            # Left hand
+            if result.left_hand_landmarks:
+                for lm in result.left_hand_landmarks.landmark:
+                    frame_features.extend([lm.x, lm.y, lm.z])
+            else:
+                frame_features.extend([0]*63)
+
+            # Right hand
+            if result.right_hand_landmarks:
+                for lm in result.right_hand_landmarks.landmark:
+                    frame_features.extend([lm.x, lm.y, lm.z])
+            else:
+                frame_features.extend([0]*63)
+
+            sequence.append(frame_features)
+
+        cap.release()
+
+        # Save sequences
+        for i in range(len(sequence) - SEQUENCE_LENGTH):
+            seq = sequence[i:i+SEQUENCE_LENGTH]
+            np.save(f"{OUTPUT_PATH}/{gesture}_{video}_{i}.npy", seq)
+
+holistic.close()
+print("✅ Sequence extraction complete")

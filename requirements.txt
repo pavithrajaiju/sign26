@@ -1,0 +1,9 @@
+opencv-python
+mediapipe
+numpy
+pandas
+tensorflow==2.12.0
+scikit-learn
+pyttsx3
+pillow
+tk
